@@ -43,18 +43,18 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		// Name
 		"Development",
 		// ID
-		"dev",
+		"dev", 
 		ChainType::Development,
 		move || {
 			testnet_genesis(
 				wasm_binary,
 				// Initial PoA authorities
-				vec![authority_keys_from_seed("0x81cc79728c8ae6cccc0120f6f354843d4d698a2f5876e40e848b73d3f62562b6")],
+				vec![authority_keys_from_seed("Alice")],
 				// Sudo account
-				get_account_id_from_seed::<sr25519::Public>("tribal"),
+				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				// Pre-funded accounts
 				vec![
-					// get_account_id_from_seed::<sr25519::Public>("Alice"),
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
 					get_account_id_from_seed::<sr25519::Public>("tribal"),
 					get_account_id_from_seed::<sr25519::Public>("smartalec"),
 				],
