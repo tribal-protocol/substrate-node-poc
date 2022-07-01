@@ -34,6 +34,9 @@ cargo run --release -- --dev
 The `cargo run` command will perform an initial build. Use the following command to build the node
 without launching it:
 
+YOU MUST ALSO INSTALL `protobuf` before building!!
+* `brew install protobuf`
+
 ```sh
 cargo build --release
 ```
