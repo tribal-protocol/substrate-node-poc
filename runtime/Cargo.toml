@@ -60,7 +60,7 @@ pallet-template = { version = "4.0.0-dev", default-features = false, path = "../
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.24" }
 
 [features]
-default = ["std"]
+default = ["std", "contracts-unstable-interface",	]
 std = [
 	"codec/std",
 	"scale-info/std",
@@ -116,4 +116,7 @@ try-runtime = [
 	"pallet-template/try-runtime",
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
+]
+contracts-unstable-interface = [
+	"pallet-contracts/unstable-interface"
 ]
