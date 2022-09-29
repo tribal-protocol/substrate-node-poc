@@ -169,7 +169,13 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 		/// Errors should have helpful documentation associated with them.
 		StorageOverflow,
 		/// A user attempted to upload an identical content 
-		CouldNotDetermineBlockNumber
+		CouldNotDetermineBlockNumber,
+
+		ContentNotFound,
+
+		ContentNotAccessible,
+
+		ContentAlreadyAccessibleByAccount
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -216,45 +222,29 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 		#[pallet::weight(10_000)]
 		pub fn lease_content(origin: OriginFor<T>, content_key: Vec<u8>, tribe_public_key: T::AccountId) -> DispatchResult {
 
-			// does this content_guid exist? if no..
-                // walk chain to find content_guid signed by caller
-                // is this a valid content_guid from the caller? 
-                // store content fingerprint as local var
 			let who = ensure_signed(origin)?;
 
-
-
-			// get current block number
-			// let current_block_number = <frame_system::Pallet<T>>::block_number();
-
-			let all_event_count = <frame_system::Pallet<T>>::event_count();
-
-			// let c_b: &str = current_block_number.as_ref();
-
-			// print(format!("{:?}", current_block_number).as_str());
-			// debug::info!(&all_event_count);
-			log::info!("Events: {}", all_event_count);
-			// print(all_event_count.to_string().as_str());
-
-
-
-			// get block itself
-
-            
-            // is the signature from the caller? 
-                // check signature, validate against caller public key
-
-
-            // ask content server for file @ user_content_signature
-                // hash file, does it match content fingerprint on chain? if no, fail
-
-            
-            print("hello");
-
+			let _content = match <ContentStorage<T>>::try_get(who.clone(), content_key.clone()) {
+				Ok(v) => v,
+				Err(_) => {
+					return Err(Error::<T>::ContentNotFound.into())
+				}
+			};
 
             // is there an active lease against this tribe for this content key?
-            // walk chain to find all active leases for specified tribe, 
+			let _lease = match <ContentAccessStorageByAccount<T>>::try_get(tribe_public_key.clone(), content_key.clone()) {
+				Ok(v) => {
+					if v == ContentAccessPolicy::NotAccessible {
+						return Err(Error::<T>::ContentNotAccessible.into())
+					}
+					return Err(Error::<T>::ContentAlreadyAccessibleByAccount.into())
+				},
+				Err(_) => false
+			};
 
+			// by now, we're ok with creating the lease.
+			<ContentAccessStorageByAccount<T>>::insert(tribe_public_key.clone(), content_key.clone(), ContentAccessPolicy::ContentLeaseAssigned);
+			Self::deposit_event(Event::ContentAccessPolicyChange(tribe_public_key.clone(), content_key.clone(), ContentAccessPolicy::ContentLeaseAssigned));
 
             // generate signature of content_key using contract's identity (tribe_content_signature)
 
