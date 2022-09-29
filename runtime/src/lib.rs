@@ -10,7 +10,7 @@ use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
 
-use frame_support::{weights::DispatchClass};
+use frame_support::{weights::DispatchClass, PalletId};
 use frame_system::limits::{BlockLength, BlockWeights};
 use pallet_contracts::{DefaultContractAccessWeight};
 
@@ -361,10 +361,16 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+parameter_types! {
+	pub const TribalPalletId: PalletId = PalletId(*b"trblprtc");
+}
 
 /// Configure the pallet-tribal in pallets/tribal.
 impl pallet_tribal::Config for Runtime {
 	type Event = Event;
+	type TimeProvider = pallet_timestamp::Pallet<Runtime>;
+	type Randomness = RandomnessCollectiveFlip;
+	type PalletId = TribalPalletId;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

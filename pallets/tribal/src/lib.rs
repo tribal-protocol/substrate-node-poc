@@ -16,22 +16,64 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
-	use frame_support::inherent::Vec;
+	
+	use core::marker::PhantomData;
+
+use frame_support::{pallet_prelude::*, log, PalletId};
+	use frame_system::{pallet_prelude::*};
+	use frame_support::inherent::{Vec};
+	use frame_support::sp_runtime::print;
+	use frame_support::traits::{UnixTime, Randomness};
 	// use uuid::Uuid;
 	use nuuid;
+	
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo)]
+	pub struct ContentItem {
+		content_key: Vec<u8>,
+		fingerprint: Vec<u8>,
+		block_number: Vec<u8>,
+		created_date: u128
+	}
+	// #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo)]
+	// pub struct ContentStore {
+	// 	content: Vec<ContentItem>
+	// }
 
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo)]
+	pub struct LeaseItem {
+		content_info: ContentItem,
+		lease_date: u128
+	}
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
+	pub enum ContentAccessPolicy {
+		NotAccessible,
+		ContentOwner,
+		ContentLeaseAssigned,
+		ContentLeaseRevoked,
+	}
+
+	impl Default for ContentAccessPolicy {
+		fn default() -> Self { ContentAccessPolicy::NotAccessible }
+	}
+
+	
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
+
+		#[pallet::constant]
+		type PalletId: Get<PalletId>;
+
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type TimeProvider: UnixTime;
+		type Randomness: Randomness<Self::Hash, Self::BlockNumber>;
 	}
 
 	#[pallet::pallet]
+	#[pallet::without_storage_info]
 	#[pallet::generate_store(pub(super) trait Store)]
-	pub struct Pallet<T>(_);
+	pub struct Pallet<T>(PhantomData<T>);
 
 	// The pallet's runtime storage items.
 	// https://docs.substrate.io/v3/runtime/storage
@@ -40,6 +82,69 @@ pub mod pallet {
 	// Learn more about declaring storage items:
 	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
 	pub type Something<T> = StorageValue<_, u32>;
+
+
+	// content storage
+	#[pallet::storage]
+	#[pallet::getter(fn content_storage)]
+	pub(super) type ContentStorage<T: Config> = StorageDoubleMap<
+		_,
+		// hasher type 
+		Blake2_128Concat, 
+		// key of map
+		T::AccountId, 
+
+		// THIS IS THE FINGERPRINT!!
+		Blake2_128Concat,
+		Vec<u8>,
+
+		// the content item itself
+		ContentItem, 
+		// type of return value
+		ValueQuery
+	>;
+
+
+	// lease storage 
+	#[pallet::storage]
+	#[pallet::getter(fn content_access_storage_user)]
+	pub(super) type ContentAccessStorageByAccount<T: Config> = StorageDoubleMap<
+		_, 
+
+		// User record
+		Blake2_128Concat, 
+		T::AccountId,
+
+		// fingerprint
+		Blake2_128Concat, 
+		Vec<u8>, 
+
+		// Access Type
+		ContentAccessPolicy,
+		ValueQuery
+	>;
+
+	// // lease storage 
+	// #[pallet::storage]
+	// #[pallet::getter(fn content_access_storage_fingerprint)]
+	// pub(super) type ContentAccessStorageByFingerprint<T: Config> = StorageDoubleMap<
+	// 	_, 
+
+	// 	// fingerprint
+	// 	Blake2_128Concat, 
+	// 	Vec<u8>, 
+
+	// 	// User record
+	// 	Blake2_128Concat, 
+	// 	T::AccountId,
+
+	// 	// Access Type
+	// 	ContentAccessPolicy,
+	// 	ValueQuery
+	// >;
+	
+	
+
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
@@ -50,14 +155,10 @@ pub mod pallet {
 		/// parameters. [something, who]
 		SomethingStored(u32, T::AccountId),
 
-		/// Check for duplicate fingerprint on chain [who]
-		FingerprintValidated(T::AccountId),
-
-		/// Fingerprint has been validated, and stored on chain [fingerprint, who]
-		ContentFingerprintValidated(Vec<u8>, T::AccountId),
-
 		/// ContentKey generated for create content extrensic. [content_key, who]
-		ContentKey(Vec<u8>, T::AccountId),
+		CreateContentKey(Vec<u8>, T::AccountId),
+		/// ContentAccessPolicy generated to determine access to a specific content. [who, fingerprint, policy]
+		ContentAccessPolicyChange(T::AccountId, Vec<u8>, ContentAccessPolicy),
 	}
 
 	// Errors inform users that something went wrong.
@@ -67,6 +168,8 @@ pub mod pallet {
 		NoneValue,
 		/// Errors should have helpful documentation associated with them.
 		StorageOverflow,
+		/// A user attempted to upload an identical content 
+		CouldNotDetermineBlockNumber
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -80,20 +183,95 @@ pub mod pallet {
 
 			// ensure transaction is signed
 			let who = ensure_signed(origin)?;
+			let time = T::TimeProvider::now().as_nanos();
 
-			// TODO check if fingerprint already exists on chain
+			// generate this first, so the time between validate and write to storage is fast
+			let content_key_seed = Self::generate_random_number(time).to_le_bytes();
+			let content_key: Vec<u8> = nuuid::Uuid::new_v5(nuuid::NAMESPACE_DNS, &content_key_seed).to_bytes().to_vec();
+			let mut bn: Vec<u8> = <frame_system::Pallet<T>>::block_number().encode();
+			bn.reverse();
 
-			// write fingerprint to chain as an event of this extrensic
-			Self::deposit_event(Event::ContentFingerprintValidated(fingerprint, who.clone()));
 
-			// write ContentKey to chain as an event of this extrensic
+			// write ContentKey to chain as an event of this extrensic, and store it.
+			<ContentStorage<T>>::insert(who.clone(), content_key.clone(), ContentItem {
+				content_key: content_key.clone(),
+				fingerprint: fingerprint.clone(),
+				block_number: bn,
+				created_date: time
+			});
+			Self::deposit_event(Event::CreateContentKey(content_key.clone(), who.clone()));
 
-			// let content_key = Uuid::new_v4().as_bytes().to_vec();
-			// let content_key = Uuid;
-			let content_key: Vec<u8> = nuuid::Uuid::new_v5(nuuid::NAMESPACE_DNS, b"tribalprotocol.io").to_bytes().to_vec();
-			Self::deposit_event(Event::ContentKey(content_key, who.clone()));
+			// assign content access policy to content owner (for now, its just the content creator)
+			<ContentAccessStorageByAccount<T>>::insert(
+				who.clone(),
+				content_key.clone(),
+				ContentAccessPolicy::ContentOwner
+			);
+			Self::deposit_event(Event::ContentAccessPolicyChange(who.clone(), content_key.clone(), ContentAccessPolicy::ContentOwner));
 			Ok(())
 		}
+
+		
+
+		#[pallet::weight(10_000)]
+		pub fn lease_content(origin: OriginFor<T>, content_key: Vec<u8>, tribe_public_key: T::AccountId) -> DispatchResult {
+
+			// does this content_guid exist? if no..
+                // walk chain to find content_guid signed by caller
+                // is this a valid content_guid from the caller? 
+                // store content fingerprint as local var
+			let who = ensure_signed(origin)?;
+
+
+
+			// get current block number
+			// let current_block_number = <frame_system::Pallet<T>>::block_number();
+
+			let all_event_count = <frame_system::Pallet<T>>::event_count();
+
+			// let c_b: &str = current_block_number.as_ref();
+
+			// print(format!("{:?}", current_block_number).as_str());
+			// debug::info!(&all_event_count);
+			log::info!("Events: {}", all_event_count);
+			// print(all_event_count.to_string().as_str());
+
+
+
+			// get block itself
+
+            
+            // is the signature from the caller? 
+                // check signature, validate against caller public key
+
+
+            // ask content server for file @ user_content_signature
+                // hash file, does it match content fingerprint on chain? if no, fail
+
+            
+            print("hello");
+
+
+            // is there an active lease against this tribe for this content key?
+            // walk chain to find all active leases for specified tribe, 
+
+
+            // generate signature of content_key using contract's identity (tribe_content_signature)
+
+            // call content server with content_signature to symlink with tribe_content_signature
+			Ok(())
+		}
+
+		// #[pallet::weight(10_000)]
+		// pub fn revoke_content_lease(origin: OriginFor<T>, content_key: Vec<u8>, tribe_public_key: Vec<u8>) -> DispatchResult {
+
+
+		// 	Ok(())
+		// }
+
+		
+
+
 
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
@@ -130,6 +308,15 @@ pub mod pallet {
 					Ok(())
 				},
 			}
+		}
+	}
+
+	impl <T: Config> Pallet<T> {
+		fn generate_random_number(seed: u128) -> u32 {
+			let (random_seed, _) = T::Randomness::random(&(T::PalletId::get(), seed).encode());
+			let random_number = <u32>::decode(&mut random_seed.as_ref())
+				.expect("secure hashes should always be bigger than u32; qed");
+			random_number
 		}
 	}
 }
