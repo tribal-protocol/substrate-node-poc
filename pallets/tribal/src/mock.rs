@@ -23,7 +23,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
-		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
+		TribalModule: pallet_template::{Pallet, Call, Storage, Event<T>},
 	}
 );
 parameter_types! {
@@ -76,5 +76,8 @@ impl pallet_template::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	let t = system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
+	let mut ext = sp_io::TestExternalities::new(t);
+    ext.execute_with(|| System::set_block_number(1));
+    ext
 }

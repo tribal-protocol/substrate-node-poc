@@ -34,10 +34,6 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 		block_number: Vec<u8>,
 		created_date: u128
 	}
-	// #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo)]
-	// pub struct ContentStore {
-	// 	content: Vec<ContentItem>
-	// }
 
 	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo)]
 	pub struct LeaseItem {
@@ -94,7 +90,7 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 		// key of map
 		T::AccountId, 
 
-		// THIS IS THE FINGERPRINT!!
+		// THIS IS THE CONTENT KEY!!
 		Blake2_128Concat,
 		Vec<u8>,
 
@@ -123,26 +119,6 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 		ContentAccessPolicy,
 		ValueQuery
 	>;
-
-	// // lease storage 
-	// #[pallet::storage]
-	// #[pallet::getter(fn content_access_storage_fingerprint)]
-	// pub(super) type ContentAccessStorageByFingerprint<T: Config> = StorageDoubleMap<
-	// 	_, 
-
-	// 	// fingerprint
-	// 	Blake2_128Concat, 
-	// 	Vec<u8>, 
-
-	// 	// User record
-	// 	Blake2_128Concat, 
-	// 	T::AccountId,
-
-	// 	// Access Type
-	// 	ContentAccessPolicy,
-	// 	ValueQuery
-	// >;
-	
 	
 
 
@@ -192,7 +168,8 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 			let time = T::TimeProvider::now().as_nanos();
 
 			// generate this first, so the time between validate and write to storage is fast
-			let content_key_seed = Self::generate_random_number(time).to_le_bytes();
+			let z = 111;
+			let content_key_seed = Self::generate_random_number(z).to_le_bytes();
 			let content_key: Vec<u8> = nuuid::Uuid::new_v5(nuuid::NAMESPACE_DNS, &content_key_seed).to_bytes().to_vec();
 			let mut bn: Vec<u8> = <frame_system::Pallet<T>>::block_number().encode();
 			bn.reverse();
@@ -231,6 +208,9 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 				}
 			};
 
+			
+
+
             // is there an active lease against this tribe for this content key?
 			let _lease = match <ContentAccessStorageByAccount<T>>::try_get(tribe_public_key.clone(), content_key.clone()) {
 				Ok(v) => {
@@ -252,6 +232,8 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 			Ok(())
 		}
 
+
+		// todo 
 		// #[pallet::weight(10_000)]
 		// pub fn revoke_content_lease(origin: OriginFor<T>, content_key: Vec<u8>, tribe_public_key: Vec<u8>) -> DispatchResult {
 
