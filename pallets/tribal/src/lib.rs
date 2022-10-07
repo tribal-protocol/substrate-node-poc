@@ -19,7 +19,7 @@ pub mod pallet {
 	
 	use core::marker::PhantomData;
 
-use frame_support::{pallet_prelude::*, log, PalletId};
+use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::{pallet_prelude::*};
 	use frame_support::inherent::{Vec};
 	use frame_support::sp_runtime::print;
@@ -51,7 +51,6 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 	impl Default for ContentAccessPolicy {
 		fn default() -> Self { ContentAccessPolicy::NotAccessible }
 	}
-
 	
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -78,7 +77,6 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 	// Learn more about declaring storage items:
 	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
 	pub type Something<T> = StorageValue<_, u32>;
-
 
 	// content storage
 	#[pallet::storage]
@@ -122,8 +120,7 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 	
 
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/v3/runtime/events-and-errors
+	// Pallets use events to inform users when important changes are made.	
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -174,7 +171,6 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 			let mut bn: Vec<u8> = <frame_system::Pallet<T>>::block_number().encode();
 			bn.reverse();
 
-
 			// write ContentKey to chain as an event of this extrensic, and store it.
 			<ContentStorage<T>>::insert(who.clone(), content_key.clone(), ContentItem {
 				content_key: content_key.clone(),
@@ -183,7 +179,7 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 				created_date: time
 			});
 			Self::deposit_event(Event::CreateContentKey(content_key.clone(), who.clone()));
-
+			
 			// assign content access policy to content owner (for now, its just the content creator)
 			<ContentAccessStorageByAccount<T>>::insert(
 				who.clone(),
@@ -242,9 +238,6 @@ use frame_support::{pallet_prelude::*, log, PalletId};
 		// }
 
 		
-
-
-
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
