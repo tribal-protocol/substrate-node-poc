@@ -29,18 +29,13 @@ fn create_content_ensure_exists() {
 	new_test_ext().execute_with(|| {
 		let test_fingerprint = b"OMG";
 		let signed_origin = Origin::signed(7);
-		//let who = frame_system::ensure_signed(signed_origin).unwrap();
 
-		assert_ok!(TribalModule::create_content(signed_origin, test_fingerprint.to_vec()));
+		assert_ok!(TribalModule::create_content(signed_origin.clone(), test_fingerprint.to_vec()));
 		
-		//System::assert_has_event(crate::Event::CreateContentKey(who.clone(), 7).into());
+		//let all_content =TribalModule::get_all_storage_for_content_owner(signed_origin.clone());
 
-		println!("{}", System::events().len());
-		// for event in System::events() {
-		// 	println!("{:?}", event.event);
-		// }
-
-		let z = System::events().into_iter().map(|r| r.event).filter_map(|e| {
+		let events =  System::events();
+		let z = events.into_iter().map(|r| r.event).filter_map(|e| {
 		 	// if let 
 
 		 	if let Event::TribalModule(inner) = e {				
@@ -50,20 +45,11 @@ fn create_content_ensure_exists() {
 		 	}
 		 }).next().unwrap();
 
-		// TribalModule::deposit_event(z)
 		 println!("{:?}", z);		 
 
 		 let pallet_event: crate::Event<Test> = z.try_into().unwrap();
 		 println!("{:?}", pallet_event);
 
-//		 let (something, who) = match pallet_event {
-//			crate::Event::CreateContentKey(, )
-//		 };
-		 //let who = frame_system::ensure_signed(signed_origin).unwrap();
-		 
-		//<<Test as Config>::		
-		// let val1 = &System::events()[0].event;
-			
 
 	});
 }

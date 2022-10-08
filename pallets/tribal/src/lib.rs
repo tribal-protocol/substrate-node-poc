@@ -18,13 +18,11 @@ mod benchmarking;
 pub mod pallet {
 	
 	use core::marker::PhantomData;
-
-use frame_support::{pallet_prelude::*, PalletId};
+	use frame_support::{pallet_prelude::*, PalletId};
 	use frame_system::{pallet_prelude::*};
 	use frame_support::inherent::{Vec};
 	use frame_support::sp_runtime::print;
-	use frame_support::traits::{UnixTime, Randomness};
-	// use uuid::Uuid;
+	use frame_support::traits::{UnixTime, Randomness};	
 	use nuuid;
 	
 	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo)]
@@ -40,6 +38,7 @@ use frame_support::{pallet_prelude::*, PalletId};
 		content_info: ContentItem,
 		lease_date: u128
 	}
+
 	#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
 	pub enum ContentAccessPolicy {
 		NotAccessible,
@@ -82,22 +81,16 @@ use frame_support::{pallet_prelude::*, PalletId};
 	#[pallet::storage]
 	#[pallet::getter(fn content_storage)]
 	pub(super) type ContentStorage<T: Config> = StorageDoubleMap<
-		_,
-		// hasher type 
-		Blake2_128Concat, 
-		// key of map
-		T::AccountId, 
+		_,		
+		Blake2_128Concat, 	// hasher type 		
+		T::AccountId, 		// key of map
 
-		// THIS IS THE CONTENT KEY!!
-		Blake2_128Concat,
+		Blake2_128Concat,	// THIS IS THE CONTENT KEY!!
 		Vec<u8>,
-
-		// the content item itself
-		ContentItem, 
-		// type of return value
-		ValueQuery
+		
+		ContentItem, 		// the content item itself		
+		ValueQuery			// type of return value
 	>;
-
 
 	// lease storage 
 	#[pallet::storage]
@@ -105,31 +98,26 @@ use frame_support::{pallet_prelude::*, PalletId};
 	pub(super) type ContentAccessStorageByAccount<T: Config> = StorageDoubleMap<
 		_, 
 
-		// User record
-		Blake2_128Concat, 
+		Blake2_128Concat, 		// User record
 		T::AccountId,
 
-		// fingerprint
-		Blake2_128Concat, 
+		Blake2_128Concat, 		// fingerprint
 		Vec<u8>, 
-
-		// Access Type
-		ContentAccessPolicy,
+		
+		ContentAccessPolicy,	// Access Type
 		ValueQuery
 	>;
-	
-
 
 	// Pallets use events to inform users when important changes are made.	
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
+		/// Event documentation should end with an array that provides descriptive names for event parameters. [something, who]
 		SomethingStored(u32, T::AccountId),
 
 		/// ContentKey generated for create content extrensic. [content_key, who]
 		CreateContentKey(Vec<u8>, T::AccountId),
+		
 		/// ContentAccessPolicy generated to determine access to a specific content. [who, fingerprint, policy]
 		ContentAccessPolicyChange(T::AccountId, Vec<u8>, ContentAccessPolicy),
 	}
@@ -161,13 +149,12 @@ use frame_support::{pallet_prelude::*, PalletId};
 		pub fn create_content(origin: OriginFor<T>, fingerprint: Vec<u8>) -> DispatchResult {
 
 			// ensure transaction is signed
-			let who = ensure_signed(origin)?;
+			let who = ensure_signed(origin.clone())?;
 			let time = T::TimeProvider::now().as_nanos();
 
-			// generate this first, so the time between validate and write to storage is fast
-			let z = 111;
-			let content_key_seed = Self::generate_random_number(z).to_le_bytes();
-			let content_key: Vec<u8> = nuuid::Uuid::new_v5(nuuid::NAMESPACE_DNS, &content_key_seed).to_bytes().to_vec();
+			//// generate this first, so the time between validate and write to storage is fast
+			let content_key: Vec<u8> = Self::generate_content_key(time);
+
 			let mut bn: Vec<u8> = <frame_system::Pallet<T>>::block_number().encode();
 			bn.reverse();
 
@@ -282,6 +269,25 @@ use frame_support::{pallet_prelude::*, PalletId};
 			let random_number = <u32>::decode(&mut random_seed.as_ref())
 				.expect("secure hashes should always be bigger than u32; qed");
 			random_number
+		}
+
+		/*
+		pub fn get_all_storage_for_content_owner(origin: OriginFor<T>) -> Vec<ContentStorage<T>> {
+			let who = ensure_signed(origin);
+
+			let matches = Vec::<ContentStorage<T>>::new();
+			// let results = <ContentStorage<T>>::iter_keys().filter_map(|key {
+			// 	key
+			// });
+
+			matches
+		}
+		*/
+
+		fn generate_content_key(seed: u128) -> Vec<u8> {
+			let content_key_seed = Self::generate_random_number(seed).to_le_bytes();
+			let content_key: Vec<u8> = nuuid::Uuid::new_v5(nuuid::NAMESPACE_DNS, &content_key_seed).to_bytes().to_vec();
+			content_key
 		}
 	}
 }
